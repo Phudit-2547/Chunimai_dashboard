@@ -62,7 +62,7 @@ The dashboard will be available at **http://localhost:3000**.
 
 ### 4. Run with Docker Compose
 
-> **Note:** The dashboard expects to join an existing Docker network (`chunimai_spend_tracker_default`) where the PostgreSQL container is running.
+> **Note:** The dashboard expects to join an existing Docker network (`chunimai_tracker`) where the PostgreSQL container is running.
 
 ```bash
 docker compose up -d

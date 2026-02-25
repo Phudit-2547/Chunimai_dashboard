@@ -14,4 +14,4 @@ services:
 networks:
   scraper_net:
     external: true
-    name: chunimai_spend_tracker_default
+    name: chunimai_tracker
