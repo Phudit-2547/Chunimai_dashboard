@@ -1,0 +1,13 @@
+{
+  "name": "chunimai-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "elysia": "^1.2",
+    "@elysiajs/static": "^1.2"
+  }
+}

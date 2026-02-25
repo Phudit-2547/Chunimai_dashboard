@@ -1,0 +1,17 @@
+services:
+  dashboard:
+    image: ghcr.io/phudit-2547/chunimai-dashboard:latest
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://chunimai:${POSTGRES_PASSWORD}@db:5432/chunimai
+      TZ: Asia/Bangkok
+    ports:
+      - "3000:3000"
+    networks:
+      - scraper_net
+
+networks:
+  scraper_net:
+    external: true
+    name: chunimai_spend_tracker_default

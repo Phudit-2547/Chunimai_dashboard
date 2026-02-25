@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chunimai Dashboard</title>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/cal-heatmap/dist/cal-heatmap.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/cal-heatmap/dist/cal-heatmap.css">
+  <script src="https://unpkg.com/@popperjs/core@2"></script>
+  <script src="https://unpkg.com/cal-heatmap/dist/plugins/Tooltip.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      padding: 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2rem;
+    }
+    h1 { font-size: 1.5rem; font-weight: 600; }
+    .heatmap-section {
+      width: 100%;
+      max-width: 1100px;
+    }
+    .heatmap-section h2 {
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .section-header h2 {
+      margin-bottom: 0;
+    }
+    .year-select {
+      background: #1c2128;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      outline: none;
+    }
+    .year-select:hover {
+      border-color: #58a6ff;
+    }
+    .heatmap-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    @media (min-width: 1100px) {
+      .heatmap-container {
+        overflow-x: visible;
+      }
+    }
+    #ch-tooltip {
+      background: #1c2128;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      pointer-events: none;
+      white-space: pre-line;
+    }
+    .tap-info {
+      font-size: 0.85rem;
+      color: #9da5b0;
+      min-height: 1.4em;
+      margin-bottom: 0.5rem;
+    }
+    .tap-info.active {
+      color: #e6edf3;
+    }
+  </style>
+</head>
+<body>
+  <h1>Chunimai Dashboard</h1>
+
+  <div class="heatmap-section">
+    <div class="section-header">
+      <h2>maimai</h2>
+      <select class="year-select" id="year-maimai"></select>
+    </div>
+    <p class="tap-info" id="info-maimai"></p>
+    <div class="heatmap-container" id="cal-maimai"></div>
+  </div>
+
+  <div class="heatmap-section">
+    <div class="section-header">
+      <h2>CHUNITHM</h2>
+      <select class="year-select" id="year-chunithm"></select>
+    </div>
+    <p class="tap-info" id="info-chunithm"></p>
+    <div class="heatmap-container" id="cal-chunithm"></div>
+  </div>
+
+  <script>
+    async function fetchYears() {
+      const res = await fetch("/api/years");
+      return res.json();
+    }
+
+    async function fetchData(year) {
+      const url = year ? `/api/play-data?year=${year}&spillover=1` : "/api/play-data";
+      const res = await fetch(url);
+      return res.json();
+    }
+
+    function populateYearSelect(selectId, years, onChange) {
+      const sel = document.getElementById(selectId);
+      sel.innerHTML = "";
+      years.forEach(y => {
+        const opt = document.createElement("option");
+        opt.value = y;
+        opt.textContent = y;
+        sel.appendChild(opt);
+      });
+      // Default to the latest year
+      if (years.length) sel.value = years[years.length - 1];
+      sel.addEventListener("change", () => onChange(sel.value));
+    }
+
+    async function createHeatmap(selector, gameData, colorScheme, ratingLookup, infoSelector, startDate) {
+      const startYear = startDate.getFullYear();
+      const cal = new CalHeatmap();
+      await cal.paint(
+        {
+          itemSelector: selector,
+          range: 13,
+          domain: {
+            type: "month",
+            gutter: 4,
+            label: {
+              text: function (ts) {
+                const d = new Date(ts);
+                if (d.getFullYear() > startYear) return "";
+                return d.toLocaleDateString("en-US", { month: "short" });
+              },
+              textAlign: "start",
+              position: "top",
+            },
+          },
+          subDomain: {
+            type: "ghDay",
+            radius: 2,
+            width: 15,
+            height: 15,
+            gutter: 4,
+          },
+          date: { start: startDate },
+          data: {
+            source: gameData,
+            type: "json",
+            x: "date",
+            y: "value",
+            groupY: "sum",
+          },
+          scale: {
+            color: {
+              type: "threshold",
+              range: colorScheme,
+              domain: [1, 2, 3, 5],
+            },
+          },
+          theme: "dark",
+        },
+        [
+          [
+            Tooltip,
+            {
+              text: function (timestamp, value, dayjsDate) {
+                const count = value ?? 0;
+                const label = count === 1 ? "play" : "plays";
+                const dateKey = dayjsDate.format("YYYY-MM-DD");
+                const rating = ratingLookup[dateKey];
+                let line = count + " " + label + " on " + dayjsDate.format("MMM D, YYYY");
+                if (rating != null) {
+                  line += "\nRating: " + rating.toFixed(2);
+                }
+                return line;
+              },
+            },
+          ],
+        ]
+      );
+
+      // Trim January overflow: remove cells past first week, resize SVG
+      trimOverflow(selector, startYear);
+
+      // Mobile tap support
+      document.querySelector(selector).addEventListener("click", function (event) {
+        const rect = event.target.closest("rect");
+        if (!rect) return;
+
+        const datum = d3.select(rect).datum();
+        if (!datum || !datum.t) return;
+
+        const dateObj = new Date(datum.t);
+        const dateKey = dateObj.toISOString().slice(0, 10);
+        const formatted = dateObj.toLocaleDateString("en-US", {
+          month: "short", day: "numeric", year: "numeric"
+        });
+
+        const count = datum.v ?? 0;
+        const lblTxt = count === 1 ? "play" : "plays";
+        const rating = ratingLookup[dateKey];
+
+        let text = count + " " + lblTxt + " on " + formatted;
+        if (rating != null) {
+          text += " · Rating: " + rating.toFixed(2);
+        }
+
+        const infoEl = document.querySelector(infoSelector);
+        infoEl.textContent = text;
+        infoEl.classList.add("active");
+      });
+
+      return cal;
+    }
+
+    function trimOverflow(selector, startYear) {
+      const container = document.querySelector(selector);
+      const svg = container && container.querySelector("svg");
+      if (!svg) return;
+
+      // Find the first Saturday of January next year (end of spillover week)
+      const jan1 = new Date(startYear + 1, 0, 1);
+      const dayOfWeek = jan1.getDay(); // 0=Sun
+      const spilloverEnd = new Date(jan1);
+      spilloverEnd.setDate(jan1.getDate() + (6 - dayOfWeek)); // next Saturday
+      const maxTs = spilloverEnd.getTime() + 86400000; // exclusive
+
+      // Remove cells beyond the spillover week
+      d3.select(selector).selectAll("rect").each(function () {
+        const datum = d3.select(this).datum();
+        if (!datum || !datum.t) return;
+        if (datum.t >= maxTs) {
+          d3.select(this).remove();
+        }
+      });
+
+      // Resize SVG to fit remaining content
+      const bbox = svg.getBBox();
+      const newWidth = Math.ceil(bbox.x + bbox.width + 4);
+      const newHeight = Math.ceil(bbox.y + bbox.height);
+      svg.setAttribute("width", newWidth);
+      svg.setAttribute("height", newHeight);
+      svg.setAttribute("viewBox", "0 0 " + newWidth + " " + newHeight);
+    }
+
+    function destroyHeatmap(selector) {
+      const el = document.querySelector(selector);
+      if (el) el.innerHTML = "";
+    }
+
+    async function renderGame(selector, infoSelector, data, gameKey, ratingKey, colorScheme, year) {
+      const gameData = data.map(d => ({ date: d.date, value: d[gameKey] }));
+      const ratingLookup = {};
+      data.forEach(d => {
+        if (d[ratingKey] != null) ratingLookup[d.date] = d[ratingKey];
+      });
+
+      const startDate = new Date(`${year}-01-01`);
+
+      // Clear previous info text
+      const infoEl = document.querySelector(infoSelector);
+      if (infoEl) {
+        infoEl.textContent = "";
+        infoEl.classList.remove("active");
+      }
+
+      destroyHeatmap(selector);
+      await createHeatmap(selector, gameData, colorScheme, ratingLookup, infoSelector, startDate);
+    }
+
+    const MAIMAI_COLORS = ["#161b22", "#4a2600", "#7a4100", "#c46200", "#ff8c00"];
+    const CHUNITHM_COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
+
+    async function init() {
+      const years = await fetchYears();
+      const currentYear = String(new Date().getFullYear());
+
+      // If no years returned, add current year as fallback
+      const yearList = years.length ? years : [String(new Date().getFullYear())];
+
+      populateYearSelect("year-maimai", yearList, async (year) => {
+        const data = await fetchData(year);
+        renderGame("#cal-maimai", "#info-maimai", data, "maimai", "maimai_rating", MAIMAI_COLORS, year);
+      });
+
+      populateYearSelect("year-chunithm", yearList, async (year) => {
+        const data = await fetchData(year);
+        renderGame("#cal-chunithm", "#info-chunithm", data, "chunithm", "chunithm_rating", CHUNITHM_COLORS, year);
+      });
+
+      // Initial render with latest year
+      const data = await fetchData(currentYear);
+      renderGame("#cal-maimai", "#info-maimai", data, "maimai", "maimai_rating", MAIMAI_COLORS, currentYear);
+      renderGame("#cal-chunithm", "#info-chunithm", data, "chunithm", "chunithm_rating", CHUNITHM_COLORS, currentYear);
+    }
+
+    init();
+  </script>
+</body>
+</html>
