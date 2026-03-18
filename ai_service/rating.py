@@ -45,7 +45,7 @@ def get_rank_info(score: int) -> tuple[str, float]:
 
 def get_rank_factor(score: int) -> float:
     """Get factor based on score. Faster: multiply instead of divide."""
-    for min_score, factor, name in RANK_FACTORS:
+    for min_score, factor, _ in RANK_FACTORS:
         if score >= min_score:
             return factor
     return 0.0  # Below A
@@ -60,7 +60,7 @@ def get_next_rank(score: int) -> tuple[str, int]:
     """
     # Find current rank index (list is ordered high to low: SSS+, SSS, SS+, SS, S+, S, AAA, AA, A)
     current_idx = -1
-    for i, (min_score, factor, name) in enumerate(RANK_FACTORS):
+    for i, (min_score, _, _) in enumerate(RANK_FACTORS):
         if score >= min_score:
             current_idx = i
             break
@@ -103,7 +103,7 @@ def calculate_average_rating(player_data: dict, all_songs: list) -> float:
     return sum(all_ratings) / len(all_ratings)
 
 
-def calculate_song_rating(constant: float, score: int, dx_score: int = 0) -> float:
+def calculate_song_rating(constant: float, score: int, _dx_score: int = 0) -> float:
     """
     Calculate rating for a single song.
     rating = int(constant × achievement × factor)
@@ -113,7 +113,7 @@ def calculate_song_rating(constant: float, score: int, dx_score: int = 0) -> flo
     Args:
         constant: Song difficulty constant (e.g., 13.4)
         score: Base score (e.g., 1007471)
-        dx_score: DX score bonus (not used in calculation)
+        dx_score: DX score bonus (reserved for future use)
     
     Returns:
         Rating value
