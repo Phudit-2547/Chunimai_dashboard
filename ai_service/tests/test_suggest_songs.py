@@ -16,11 +16,10 @@ from tools.suggest_songs import (
     RANK_FACTORS,
     calc_rating,
     get_all_songs,
-    PLAYER_DATA_FILE,
 )
 
 # Import from rating directly for functions not re-exported
-from rating import get_rank_factor, calculate_average_rating
+from rating import get_rank_factor, calculate_average_rating, PLAYER_DATA_FILE
 
 
 # Load real player data for testing
