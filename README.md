@@ -29,21 +29,6 @@ A lightweight web dashboard that visualizes your **maimai** and **CHUNITHM** arc
 
 ## Getting Started
 
-### Fork & Setup for GitHub Actions
-
-If you want to fork this repository and use GitHub Actions to run the scraper automatically, follow this guide:
-
-**[Fork Chunimai Tracker Repository and Set Up Actions Secrets](https://scribehow.com/viewer/Fork_Chunimai_Tracker_Repository_and_Set_Up_Actions_Secrets__pLeL8YA5S4Kg-7uqWRPD7Q)**
-
-You'll need to configure these secrets in your forked repository:
-
-| Secret Name | Description |
-|------------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `DISCORD_WEBHOOK_URL` | Discord webhook for notifications |
-| `USERNAME` | Your SEGA ID username |
-| `PASSWORD` | Your SEGA ID password |
-
 ### 1. Clone the repository
 
 ```bash
