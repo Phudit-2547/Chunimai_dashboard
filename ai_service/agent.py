@@ -17,13 +17,13 @@ load_dotenv()
 
 # Initialize LLM
 def get_llm():
-    """Get MiniMax M2.5 LLM instance."""
-    api_key = os.getenv("MINIMAX_API_KEY")
+    """Get LLM instance."""
+    api_key = os.getenv("AI_API_KEY")
     if not api_key:
-        raise ValueError("MINIMAX_API_KEY not set")
+        raise ValueError("AI_API_KEY not set")
     
-    base_url = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.io/v1")
-    model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
+    base_url = os.getenv("AI_BASE_URL", "https://api.openai.com/v1")
+    model = os.getenv("AI_MODEL", "gpt-4")
     
     return ChatOpenAI(
         model=model,

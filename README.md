@@ -42,11 +42,13 @@ cd chunimai-dashboard
 cp .env.example .env
 ```
 
-Edit `.env` and fill in your PostgreSQL password:
+Edit `.env` and fill in your connection string and API key:
 
 ```dotenv
-POSTGRES_PASSWORD=your_password_here
-DATABASE_URL=postgresql://chunimai:your_password_here@db:5432/chunimai
+DATABASE_URL=postgresql://chunimai:your_password@db:5432/chunimai
+AI_API_KEY=your-api-key-here
+AI_BASE_URL=https://api.openai.com/v1
+AI_MODEL=gpt-4
 ```
 
 ### 3. Run locally (with Bun)
