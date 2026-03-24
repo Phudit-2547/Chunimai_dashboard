@@ -34,11 +34,17 @@ const app = new Elysia()
     if (year) {
       const yr = Number(year);
       if (spillover) {
+        const jan1 = new Date(`${yr}-01-01`);
+        const dayOfWeek = jan1.getDay(); // 0 = Sunday
+        const spillStart = new Date(jan1);
+        spillStart.setDate(jan1.getDate() - dayOfWeek); // rewind to Sunday
+        const startStr = spillStart.toISOString().slice(0, 10);
+
         // Include Jan 1-7 of next year so the last week column of Dec renders fully
         rows = await sql`
           SELECT play_date, maimai_play_count, chunithm_play_count, maimai_rating, chunithm_rating
           FROM play_data
-          WHERE play_date >= ${`${yr}-01-01`}::date
+          WHERE play_date >= ${startStr}::date
             AND play_date <= ${`${yr + 1}-01-07`}::date
           ORDER BY play_date
         `;

@@ -281,12 +281,17 @@
         infoEl.classList.remove("active");
       }
 
+      if (calInstances[selector]) {
+        calInstances[selector].destroy();
+      }
       destroyHeatmap(selector);
-      await createHeatmap(selector, gameData, colorScheme, ratingLookup, infoSelector, startDate);
+      calInstances[selector] = await createHeatmap(selector, gameData, colorScheme, ratingLookup, infoSelector, startDate);
     }
 
     const MAIMAI_COLORS = ["#161b22", "#4a2600", "#7a4100", "#c46200", "#ff8c00"];
     const CHUNITHM_COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
+
+    const calInstances = {};
 
     async function init() {
       const years = await fetchYears();
