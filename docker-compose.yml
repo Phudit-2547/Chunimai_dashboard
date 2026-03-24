@@ -8,10 +8,3 @@ services:
       TZ: Asia/Bangkok
     ports:
       - "3000:3000"
-    networks:
-      - scraper_net
-
-networks:
-  scraper_net:
-    external: true
-    name: chunimai_tracker

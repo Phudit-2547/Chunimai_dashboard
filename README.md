@@ -64,7 +64,7 @@ The dashboard will be available at **http://localhost:3000**.
 
 ### 4. Run with Docker Compose
 
-> **Note:** The dashboard expects to join an existing Docker network (`chunimai_tracker`) where the PostgreSQL container is running.
+> **Note:** Set `DATABASE_URL` in `.env` pointing to your cloud PostgreSQL (e.g., Supabase, Neon, Railway).
 
 ```bash
 docker compose up -d
