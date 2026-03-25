@@ -199,7 +199,7 @@ if __name__ == "__main__":
     # Test the agent
     test_queries = [
         # "Suggest songs to improve my rating",
-        "I want to get my rating to 15K what songs should I play?",
+        "I want to get my rating to 16K what songs should I play?",
     ]
     
     for query in test_queries:

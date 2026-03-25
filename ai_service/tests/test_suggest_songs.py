@@ -121,19 +121,19 @@ def test_suggest_songs_target_mode():
     result = suggest_songs(
         player_data=player_data,
         all_songs=all_songs,
-        target_rating=15000,
+        target_rating=16000,
         mode="target",
     )
     
     assert result["mode"] == "target"
-    assert result["target_rating"] == 15000
+    assert result["target_rating"] == 16000
     assert result["rating_needed"] == result["target_rating"] - result["current_rating"]
     assert "songs" in result
     assert result["projected_rating"] > 0  # Just check it calculates something
     
     # Print FULL debug output
     print(f"\n{'='*80}")
-    print("=== TARGET MODE (15000) - FULL DEBUG OUTPUT ===")
+    print("=== TARGET MODE (16000) - FULL DEBUG OUTPUT ===")
     print(f"{'='*80}")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     print(f"{'='*80}")

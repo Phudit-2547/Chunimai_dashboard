@@ -42,6 +42,12 @@ def suggest_songs(
     Returns:
         Dictionary with suggestions and calculations
     """
+    # Build allRecords lookup for historical scores
+    all_records_lookup = {}
+    for record in player_data.get("allRecords", []):
+        key = (record.get("title"), record.get("chartType"), record.get("difficulty"))
+        all_records_lookup[key] = record.get("score", 0)
+    
     # Build constants lookup
     constants = {}
     for song in all_songs:
@@ -65,10 +71,6 @@ def suggest_songs(
                 max_player_constant = c
             if c < min_player_constant:
                 min_player_constant = c
-    
-    # Filter new songs to be within player's current difficulty range
-    min_constant = min_player_constant
-    max_constant = min(max_player_constant, 15.0)
     
     # Get existing songs (title + chartType + difficulty)
     existing = set()
@@ -122,9 +124,6 @@ def suggest_songs(
             if constant <= 0:
                 continue
             
-            if constant < min_constant or constant > max_constant:
-                continue
-            
             max_rating = calculate_song_rating(constant, 1005000, 0)
             
             replace_idx = new_song_count if new_song_count < len(rating_songs) else len(rating_songs) - 1
@@ -147,6 +146,11 @@ def suggest_songs(
             
             target_rank_rating = calculate_song_rating(constant, min_score_needed, 0)
             
+            # Check if player has played this song before in allRecords
+            history_score = all_records_lookup.get(key, 0)
+            history_rank, history_pct = get_rank_info(history_score)
+            history_pct_str = f"{history_pct:.4f}%" if history_score > 0 else ""
+            
             candidates.append({
                 "title": song["title"],
                 "artist": song.get("artist", ""),
@@ -164,7 +168,10 @@ def suggest_songs(
                 "potential_rating": target_rank_rating,
                 "rating_gain": target_rank_rating - rating_replaced,
                 "replaces": rating_replaced,
-                "type": "new"
+                "type": "new",
+                "current_score": history_score,
+                "current_rank": history_rank if history_score > 0 else "",
+                "current_pct_str": history_pct_str
             })
             new_song_count += 1
     
@@ -193,6 +200,7 @@ def suggest_songs(
             rating_gain = potential_rating - current_rating_song
             
             if rating_gain > 0:
+                max_rating = calculate_song_rating(constant, 1005000, 0)
                 improvements.append({
                     "title": song["title"],
                     "artist": song.get("artist", ""),
@@ -209,6 +217,7 @@ def suggest_songs(
                     "target_rank": target_rank,
                     "target_score": target_score,
                     "potential_rating": potential_rating,
+                    "max_rating": max_rating,
                     "rating_gain": rating_gain,
                     "type": "improve"
                 })
@@ -227,23 +236,31 @@ def suggest_songs(
     if is_target_mode:
         rating_needed = target_rating - current_rating
         
-        rating_songs = []
+        # Get current top 50 ratings
+        top_50_ratings = []
         for s in player_data.get("best", []) + player_data.get("current", []):
             key = (s.get("title"), s.get("chartType"), s.get("difficulty"))
             const = constants.get(key, 0)
             if const > 0:
                 rating = calculate_song_rating(const, s.get("score", 0))
-                rating_songs.append(rating)
-        rating_songs.sort()
+                top_50_ratings.append(rating)
+        top_50_ratings.sort()  # ascending, lowest at index 0
+        
+        # Track which songs are currently in top 50 (by rating)
+        # Format: (rating, title, type)
+        top_50_songs = []  # will store (rating, song_opt_dict)
         
         all_song_options = []
         
+        # Add all improvements
         for s in improvements:
             constant = s.get("constant", 0)
             if constant <= 0:
                 continue
             max_rating = calculate_song_rating(constant, 1005000, 0)
             current_rating_song = s.get("potential_rating", 0) - s.get("rating_gain", 0)
+            potential_gain = max_rating - current_rating_song
+            
             all_song_options.append({
                 "title": s["title"],
                 "artist": s.get("artist", ""),
@@ -258,16 +275,20 @@ def suggest_songs(
                 "current_pct": s.get("current_pct", 0),
                 "current_pct_str": s.get("current_pct_str", "0.0000%"),
                 "max_rating": max_rating,
+                "potential_gain": potential_gain,
                 "type": "improve"
             })
         
+        # Add all candidates (new songs)
         for s in candidates:
             constant = s.get("constant", 0)
             if constant <= 0:
                 continue
             max_rating = calculate_song_rating(constant, 1005000, 0)
-            idx = len([x for x in all_song_options if x["type"] == "new"]) % len(rating_songs) if rating_songs else 0
-            replace_rating = rating_songs[idx] if idx < len(rating_songs) else 0
+            # For new songs, potential_gain = max_rating - lowest_in_top_50
+            # We'll calculate this during selection since top_50 changes
+            potential_gain = max_rating - top_50_ratings[0] if top_50_ratings else max_rating
+            
             all_song_options.append({
                 "title": s.get("title", ""),
                 "artist": s.get("artist", ""),
@@ -277,84 +298,162 @@ def suggest_songs(
                 "constant": constant,
                 "difficulty": s.get("difficulty", ""),
                 "chartType": s.get("chartType", ""),
-                "current_rating": replace_rating,
+                "current_rating": 0,
+                "current_score": s.get("current_score", 0),
+                "current_rank": s.get("current_rank", ""),
+                "current_pct_str": s.get("current_pct_str", ""),
                 "max_rating": max_rating,
+                "potential_gain": potential_gain,
                 "type": "new"
             })
         
-        songs_to_replace = 50
-        gain_per_song_needed = rating_needed / songs_to_replace
-        
-        avg_current = sum(rating_songs) / len(rating_songs) if rating_songs else 0
-        
-        min_gain_needed = max(10, int(gain_per_song_needed))
-        all_song_options = [s for s in all_song_options if s["max_rating"] - avg_current >= min_gain_needed]
-        
-        all_song_options.sort(key=lambda x: (x["constant"], -(x["max_rating"] - x["current_rating"])))
+        # Sort by potential_gain DESCENDING - highest gain first
+        all_song_options.sort(key=lambda x: -x["potential_gain"])
         
         selected = []
         remaining = rating_needed
+        new_songs_added = 0  # Track how many new songs have entered top 50
         
         for song_opt in all_song_options:
             if remaining <= 0:
                 break
             
-            current_r = song_opt["current_rating"]
             max_r = song_opt["max_rating"]
             
-            potential_gain = max_r - current_r
-            
-            if potential_gain <= 0:
-                continue
-            
-            actual_gain = min(potential_gain, remaining)
-            target_r = current_r + actual_gain
-            
-            min_score = 0
-            min_rank = ""
-            for ms, factor, rank_name in RANK_FACTORS:
-                potential = int(song_opt["constant"] * (ms / 10000) * factor)
-                if potential >= target_r:
-                    min_score = ms
-                    min_rank = rank_name
-                    break
-            
-            if min_score == 0:
-                min_score = 1005000
-                min_rank = "SSS+"
-            
-            selected.append({
-                "song": {
-                    "title": song_opt["title"],
-                    "artist": song_opt.get("artist", ""),
-                    "level": song_opt.get("level", ""),
-                    "image": song_opt.get("image", ""),
-                    "cover_url": get_cover_url(song_opt.get("image", "")),
-                    "version": song_opt.get("version", ""),
-                    "difficulty": song_opt["difficulty"],
-                    "chartType": song_opt["chartType"],
-                    "constant": song_opt["constant"],
-                    "target_rank": min_rank,
-                    "target_score": min_score,
-                    "achievement": round(min_score / 10000, 2),
-                    "potential_rating": target_r,
-                },
-                "gain_needed": actual_gain,
-                "max_gain": potential_gain,
-                "type": song_opt["type"],
-                "current_score": song_opt.get("current_score", 0),
-                "current_rank": song_opt.get("current_rank", ""),
-                "current_pct_str": song_opt.get("current_pct_str", ""),
-            })
-            
-            remaining -= actual_gain
+            if song_opt["type"] == "improve":
+                # Improvement: gain = max_rating - current_rating
+                # Does NOT push any song out
+                current_r = song_opt["current_rating"]
+                potential_gain = max_r - current_r
+                
+                # Only consider meaningful gains
+                if potential_gain < 10:
+                    continue
+                
+                actual_gain = min(potential_gain, remaining)
+                target_r = current_r + actual_gain
+                
+                # Update top_50: replace old rating with new rating
+                for i, r in enumerate(top_50_ratings):
+                    if abs(r - current_r) < 1:
+                        top_50_ratings[i] = target_r
+                        break
+                top_50_ratings.sort()
+                
+                # Calculate what score/rank needed for this gain
+                min_score = 0
+                min_rank = ""
+                for ms, factor, rank_name in RANK_FACTORS:
+                    potential = int(song_opt["constant"] * (ms / 10000) * factor)
+                    if potential >= target_r:
+                        min_score = ms
+                        min_rank = rank_name
+                        break
+                
+                if min_score == 0:
+                    min_score = 1005000
+                    min_rank = "SSS+"
+                
+                selected.append({
+                    "song": {
+                        "title": song_opt["title"],
+                        "artist": song_opt.get("artist", ""),
+                        "level": song_opt.get("level", ""),
+                        "image": song_opt.get("image", ""),
+                        "cover_url": get_cover_url(song_opt.get("image", "")),
+                        "version": song_opt.get("version", ""),
+                        "difficulty": song_opt["difficulty"],
+                        "chartType": song_opt["chartType"],
+                        "constant": song_opt["constant"],
+                        "target_rank": min_rank,
+                        "target_score": min_score,
+                        "achievement": round(min_score / 10000, 2),
+                        "potential_rating": target_r,
+                    },
+                    "gain_needed": actual_gain,
+                    "max_gain": potential_gain,
+                    "type": song_opt["type"],
+                    "current_score": song_opt.get("current_score", 0),
+                    "current_rank": song_opt.get("current_rank", ""),
+                    "current_pct_str": song_opt.get("current_pct_str", ""),
+                })
+                
+                remaining -= actual_gain
+                
+            else:
+                # New song: enters top 50, pushes out the lowest
+                # Gain = max_rating - lowest_rating_in_top_50
+                if max_r <= top_50_ratings[0]:
+                    continue  # Can't enter top 50 if not better than lowest
+                
+                lowest_pushed = top_50_ratings[0]
+                potential_gain = max_r - lowest_pushed
+                
+                # Only consider meaningful gains
+                if potential_gain < 10:
+                    continue
+                
+                actual_gain = min(potential_gain, remaining)
+                # The new rating we achieve = lowest_pushed + actual_gain
+                target_r = lowest_pushed + actual_gain
+                
+                # Calculate what score/rank needed
+                min_score = 0
+                min_rank = ""
+                for ms, factor, rank_name in RANK_FACTORS:
+                    potential = int(song_opt["constant"] * (ms / 10000) * factor)
+                    if potential >= target_r:
+                        min_score = ms
+                        min_rank = rank_name
+                        break
+                
+                if min_score == 0:
+                    min_score = 1005000
+                    min_rank = "SSS+"
+                
+                # Update top_50: remove lowest, add new rating
+                top_50_ratings.pop(0)
+                top_50_ratings.append(target_r)
+                top_50_ratings.sort()
+                new_songs_added += 1
+                
+                selected.append({
+                    "song": {
+                        "title": song_opt["title"],
+                        "artist": song_opt.get("artist", ""),
+                        "level": song_opt.get("level", ""),
+                        "image": song_opt.get("image", ""),
+                        "cover_url": get_cover_url(song_opt.get("image", "")),
+                        "version": song_opt.get("version", ""),
+                        "difficulty": song_opt["difficulty"],
+                        "chartType": song_opt["chartType"],
+                        "constant": song_opt["constant"],
+                        "target_rank": min_rank,
+                        "target_score": min_score,
+                        "achievement": round(min_score / 10000, 2),
+                        "potential_rating": target_r,
+                    },
+                    "gain_needed": actual_gain,
+                    "max_gain": potential_gain,
+                    "type": song_opt["type"],
+                    "current_score": song_opt.get("current_score", 0),
+                    "current_rank": song_opt.get("current_rank", ""),
+                    "current_pct_str": song_opt.get("current_pct_str", ""),
+                })
+                
+                remaining -= actual_gain
         
         projected = current_rating + sum(s["gain_needed"] for s in selected)
+        gain_achieved = sum(s["gain_needed"] for s in selected)
         
         suggestions["rating_needed"] = rating_needed
         suggestions["songs"] = selected
         suggestions["projected_rating"] = projected
-        suggestions["message"] = f"Here's the easiest path to reach {target_rating}! (+{sum(s['gain_needed'] for s in selected)} rating from {len(selected)} songs)"
+        
+        if projected >= target_rating:
+            suggestions["message"] = f"Here's the easiest path to reach {target_rating}! (+{gain_achieved} rating from {len(selected)} songs)"
+        else:
+            suggestions["message"] = f"Best path found: projected {projected} (+{gain_achieved} from {len(selected)} songs). Need {target_rating - projected} more for {target_rating}."
     else:
         improvements_sorted = sorted(improvements, key=lambda x: x["rating_gain"])
         
