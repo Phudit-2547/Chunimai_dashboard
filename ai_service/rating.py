@@ -1,3 +1,4 @@
+import glob
 import json
 import os
 import requests
@@ -8,8 +9,18 @@ COVER_BASE_URL = "https://maimai.wonderhoy.me/api/imageProxy?img="
 
 # Player data paths (relative to project root)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PLAYER_DATA_FILE = os.path.join(PROJECT_ROOT, "2026-03-13T11:04:00.000Z-undefined.json")
-FULL_PLAYER_DATA_FILE = os.path.join(PROJECT_ROOT, "full-2026-03-13T11:04:00.000Z-undefined.json")
+
+
+def _find_json_file(pattern: str) -> str:
+    """Find the most recent JSON file matching the pattern."""
+    files = glob.glob(os.path.join(PROJECT_ROOT, pattern))
+    if not files:
+        raise FileNotFoundError(f"No file found matching pattern: {pattern}")
+    return max(files, key=os.path.getmtime)
+
+
+PLAYER_DATA_FILE = _find_json_file("*T*.json")
+FULL_PLAYER_DATA_FILE = _find_json_file("full-*.json")
 
 def get_cover_url(image_filename: str) -> str:
     """Get full cover image URL from filename."""

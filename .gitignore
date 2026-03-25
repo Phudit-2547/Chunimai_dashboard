@@ -13,5 +13,5 @@ uv.lock
 
 # Player data (sensitive)
 2026-03-13T11:04:00.000Z-undefined.json
-full-2026-03-13T11:04:00.000Z-undefined.json
+full*.json
 response.json
