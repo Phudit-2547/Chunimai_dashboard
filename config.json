@@ -1,0 +1,6 @@
+{
+  "games": ["maimai", "chunithm"],
+  "currency": { "symbol": "THB", "perCredit": 40 },
+  "version": "CiRCLE",
+  "latestVersions": ["CiRCLE", "PRiSM+"]
+}

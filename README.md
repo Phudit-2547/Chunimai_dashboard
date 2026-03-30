@@ -1,8 +1,8 @@
 # Chunimai Dashboard
 
-A lightweight web dashboard that visualizes your **maimai** and **CHUNITHM** arcade play history as GitHub-style contribution heatmaps. Built with [Bun](https://bun.sh) + [Elysia](https://elysiajs.com) and [Cal-Heatmap](https://cal-heatmap.com).
+A static web dashboard that visualizes your **maimai** and **CHUNITHM** arcade play history as GitHub-style contribution heatmaps. No backend, no database server — everything runs in the browser.
 
-![Dashboard Preview](https://img.shields.io/badge/bun-%E2%89%A51.0-f472b6?logo=bun&logoColor=white) ![Elysia](https://img.shields.io/badge/elysia-1.2-blue) ![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
+![Static](https://img.shields.io/badge/GitHub%20Pages-static-brightgreen?logo=github)
 
 ## Features
 
@@ -10,98 +10,98 @@ A lightweight web dashboard that visualizes your **maimai** and **CHUNITHM** arc
 - **Year selector** — browse play history by year
 - **Tooltip & tap support** — hover or tap a cell to see play count, date, and rating
 - **Dark theme** — styled to match GitHub's dark UI
-- **Docker & CI/CD** — multi-arch Docker image auto-published to GHCR on push
+- **AI chat** — ask questions about your play history and get song suggestions (bring your own API key)
+- **Self-hosting** — Docker image available for those who prefer it
 
-## Prerequisites
+## How It Works
 
-- [Bun](https://bun.sh) ≥ 1.0 (or Docker)
-- A PostgreSQL database with a `play_data` table (provided by a separate scraper service)
+```
+GitHub Actions (daily, 22:00 Bangkok)
+  → Playwright scrapes SEGA portal
+  → Appends to public/data/play-history.json
+  → Commits to git
 
-### Expected `play_data` schema
+GitHub Actions (weekly)
+  → maimai-scraper Docker fetches user.json + songs.json
+  → Commits to git
 
-| Column                | Type    |
-| --------------------- | ------- |
-| `play_date`           | `date`  |
-| `maimai_play_count`   | `int`   |
-| `chunithm_play_count` | `int`   |
-| `maimai_rating`       | `numeric` |
-| `chunithm_rating`     | `numeric` |
+GitHub Actions (on push to main)
+  → Deploys public/ to GitHub Pages
 
-## Getting Started
+Browser
+  → Fetches data/*.json directly (no backend)
+  → AI agent calls OpenAI-compatible API with your key (BYOK)
+```
 
-### 1. Clone the repository
+## Quick Start for Friends
+
+### 1. Fork this repository
+
+### 2. Enable GitHub Pages
+
+Go to **Settings → Pages → Source** and select **GitHub Actions**.
+
+### 3. Add SEGA credentials
+
+Go to **Settings → Secrets → Actions** and add:
+- `SEGA_USERNAME` — your SEGA ID
+- `SEGA_PASSWORD` — your SEGA password
+- `DISCORD_WEBHOOK_URL` *(optional)* — for daily Discord notifications
+
+### 4. Seed your data
+
+Go to **Actions → Daily Scrape → Run workflow** — run it once to populate `play-history.json`.
+
+### 5. Open your GitHub Pages URL
+
+Your heatmaps will load from the committed JSON files.
+
+### 6. (Optional) AI chat
+
+Click **Settings** and enter your OpenAI-compatible API key. The AI can answer questions about your play history and suggest songs to improve your rating.
+
+## Local Development
 
 ```bash
-git clone https://github.com/phudit-2547/chunimai-dashboard.git
-cd chunimai-dashboard
+# Serve the static site
+python3 -m http.server -d public 8000
+# Open http://localhost:8000
+
+# Run the scraper locally (requires SEGA credentials)
+cd scraper
+uv sync && uv run playwright install firefox
+SEGA_USERNAME=... SEGA_PASSWORD=... python main.py
 ```
 
-### 2. Configure environment variables
+## Configuration
+
+Edit `config.json` in the repository root:
+
+```json
+{
+  "games": ["maimai", "chunithm"],   // which games to track
+  "currency": { "symbol": "THB", "perCredit": 40 },
+  "version": "CiRCLE"
+}
+```
+
+## GitHub Actions
+
+| Workflow | Schedule | What it does |
+|---|---|---|
+| `scrape-daily.yml` | Daily at 22:00 Bangkok | Scrapes SEGA, appends to `play-history.json` |
+| `scrape-songs.yml` | Weekly (Sunday) | Updates `user.json` + `songs.json` |
+| `deploy.yml` | On push to `main` | Deploys `public/` to GitHub Pages |
+
+All three can also be triggered manually from the **Actions** tab.
+
+## Self-Hosting with Docker
 
 ```bash
-cp .env.example .env
-```
-
-Edit `.env` and fill in your connection string and API key:
-
-```dotenv
-DATABASE_URL=postgresql://chunimai:your_password@db:5432/chunimai
-AI_API_KEY=your-api-key-here
-AI_BASE_URL=https://api.openai.com/v1
-AI_MODEL=gpt-4
-```
-
-### 3. Run locally (with Bun)
-
-```bash
-bun install
-bun run dev        # hot-reload mode
-# or
-bun run start      # production mode
-```
-
-The dashboard will be available at **http://localhost:3000**.
-
-### 4. Run with Docker Compose
-
-> **Note:** Set `DATABASE_URL` in `.env` pointing to your cloud PostgreSQL (e.g., Supabase, Neon, Railway).
-
-```bash
-docker compose up -d
-```
-
-## API Endpoints
-
-| Method | Path              | Description                              |
-| ------ | ----------------- | ---------------------------------------- |
-| `GET`  | `/`               | Serves the dashboard UI                  |
-| `GET`  | `/api/years`      | Returns available years in the database  |
-| `GET`  | `/api/play-data`  | Returns play data (optional `?year=` and `&spillover=1` query params) |
-
-## Project Structure
-
-```
-├── public/
-│   └── index.html          # Single-page dashboard (HTML + JS + CSS)
-├── src/
-│   └── index.ts            # Elysia server with API routes
-├── .github/
-│   └── workflows/
-│       └── docker-publish.yml  # CI: build & push multi-arch image to GHCR
-├── Dockerfile              # Multi-stage Bun build
-├── docker-compose.yml
-├── .env.example
-└── package.json
-```
-
-## CI/CD
-
-Pushing to `main` triggers a GitHub Actions workflow that builds a multi-arch (`linux/amd64`, `linux/arm64`) Docker image and publishes it to:
-
-```
-ghcr.io/phudit-2547/chunimai-dashboard:latest
+# Serve static files via nginx
+docker run --rm -v $(pwd)/public:/usr/share/nginx/html -p 8080:80 nginx:alpine
 ```
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+[MIT](LICENSE)

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Test</title>
+  <style>
+    body { font-family: monospace; padding: 2rem; background: #1a1a1a; color: #fff; }
+    .container { max-width: 800px; margin: 0 auto; }
+    label { display: block; margin-top: 1rem; }
+    input { width: 100%; padding: 0.5rem; margin-top: 0.25rem; background: #333; color: #fff; border: 1px solid #555; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; background: #0066cc; color: #fff; border: none; cursor: pointer; }
+    button:hover { background: #0055aa; }
+    #output { margin-top: 2rem; padding: 1rem; background: #222; white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; }
+    .error { color: #ff6666; }
+    .success { color: #66ff66; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Agent Test</h1>
+
+    <label>API Key (Bearer token)</label>
+    <input type="password" id="apiKey" placeholder="sk-...">
+
+    <label>Base URL</label>
+    <input type="text" id="baseUrl" value="https://api.mimi.fone.ai/m招呼代理/mchat/v1">
+
+    <label>Model</label>
+    <input type="text" id="model" value="MiniMax-Text-01">
+
+    <label>Question</label>
+    <input type="text" id="question" placeholder="Ask the agent something...">
+
+    <button onclick="saveAndTest()">Run Agent</button>
+    <button onclick="clearCache()">Clear Cache</button>
+
+    <h2>Output</h2>
+    <div id="output">Waiting for test...</div>
+  </div>
+
+  <script type="module">
+    import { runAgent, clearCache } from './js/agent.js';
+
+    // Load saved config
+    const apiKey = localStorage.getItem('ai_api_key') || '';
+    const baseUrl = localStorage.getItem('ai_base_url') || 'https://api.mimi.fone.ai/m招呼代理/mchat/v1';
+    const model = localStorage.getItem('ai_model') || 'MiniMax-Text-01';
+
+    document.getElementById('apiKey').value = apiKey;
+    document.getElementById('baseUrl').value = baseUrl;
+    document.getElementById('model').value = model;
+
+    window.saveAndTest = async function() {
+      const apiKeyVal = document.getElementById('apiKey').value;
+      const baseUrlVal = document.getElementById('baseUrl').value;
+      const modelVal = document.getElementById('model').value;
+      const question = document.getElementById('question').value;
+
+      localStorage.setItem('ai_api_key', apiKeyVal);
+      localStorage.setItem('ai_base_url', baseUrlVal);
+      localStorage.setItem('ai_model', modelVal);
+
+      const output = document.getElementById('output');
+      output.textContent = 'Running agent...\n';
+      output.className = '';
+
+      if (!question.trim()) {
+        output.textContent = 'Please enter a question.';
+        output.className = 'error';
+        return;
+      }
+
+      try {
+        const result = await runAgent(question);
+        output.textContent = result;
+        output.className = 'success';
+      } catch (err) {
+        output.textContent = 'Error: ' + err.message;
+        output.className = 'error';
+      }
+    };
+
+    window.clearCache = function() {
+      clearCache();
+      document.getElementById('output').textContent = 'Data cache cleared! Refresh or run again.';
+    };
+  </script>
+</body>
+</html>

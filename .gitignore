@@ -1,7 +1,7 @@
-node_modules/
 .env
 .DS_Store
-bun.lock
+.claude/
+.factory/
 
 # Python
 __pycache__/
@@ -11,7 +11,13 @@ __pycache__/
 uv.lock
 .ruff_cache/
 
-# Player data (sensitive)
-2026-03-13T11:04:00.000Z-undefined.json
+# Player data (sensitive, local only)
+*T*.json
 full*.json
 response.json
+public/data/user.json
+public/data/play-history.json
+
+# Playwright
+scraper/cookies/
+scraper/traces/

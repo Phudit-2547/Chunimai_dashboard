@@ -1,0 +1,47 @@
+name: Update Song Data
+
+on:
+  # schedule:
+  #   - cron: '0 16 * * 0' # Weekly, Sunday midnight UTC
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run maimai-scraper
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/outputs:/app/outputs \
+            -e USERNAME=${{ secrets.SEGA_USERNAME }} \
+            -e PASSWORD=${{ secrets.SEGA_PASSWORD }} \
+            -e VERSION=CiRCLE \
+            -e TZ=Asia/Bangkok \
+            ghcr.io/leomotors/maimai-scraper:v1
+
+      - name: Copy user data
+        run: |
+          # Find the full-*.json output file
+          FULL_JSON=$(ls outputs/full-*.json 2>/dev/null | head -1)
+          if [ -n "$FULL_JSON" ]; then
+            cp "$FULL_JSON" public/data/user.json
+            echo "Copied $FULL_JSON to public/data/user.json"
+          else
+            echo "WARNING: No full-*.json found in outputs/"
+          fi
+
+      - name: Fetch songs data
+        run: |
+          curl -s "https://maimai.wonderhoy.me/api/musicData?version=CiRCLE" \
+            -o public/data/songs.json
+          echo "Fetched songs.json ($(wc -c < public/data/songs.json) bytes)"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/data/user.json public/data/songs.json
+          git diff --cached --quiet || git commit -m "chore: update song data $(date -u +%Y-%m-%d)"
+          git push

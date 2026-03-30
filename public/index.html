@@ -106,16 +106,49 @@
     <div class="heatmap-container" id="cal-chunithm"></div>
   </div>
 
+  <script type="module">
+    import { runAgent } from './js/agent.js';
+    // Expose to global for chat UI integration (Member D)
+    window.runAgent = runAgent;
+  </script>
+
   <script>
+    // Cached play history data
+    let _cachedHistory = null;
+    async function getAllData() {
+      if (!_cachedHistory) {
+        const res = await fetch("data/play-history.json");
+        _cachedHistory = await res.json();
+      }
+      return _cachedHistory;
+    }
+
     async function fetchYears() {
-      const res = await fetch("/api/years");
-      return res.json();
+      const data = await getAllData();
+      const years = [...new Set(data.map(d => (d.play_date || '').slice(0, 4)).filter(y => y))];
+      const currentYear = String(new Date().getFullYear());
+      if (!years.includes(currentYear)) years.push(currentYear);
+      return years.sort();
     }
 
     async function fetchData(year) {
-      const url = year ? `/api/play-data?year=${year}&spillover=1` : "/api/play-data";
-      const res = await fetch(url);
-      return res.json();
+      const allData = await getAllData();
+      const yr = Number(year);
+      const jan1 = new Date(`${yr}-01-01`);
+      const dayOfWeek = jan1.getDay();
+      const spillStart = new Date(jan1);
+      spillStart.setDate(jan1.getDate() - dayOfWeek);
+      const startStr = spillStart.toISOString().slice(0, 10);
+      const endStr = `${yr + 1}-01-07`;
+      return allData
+        .filter(d => d.play_date >= startStr && d.play_date <= endStr)
+        .map(d => ({
+          date: d.play_date,
+          maimai_play_count: d.maimai_play_count,
+          chunithm_play_count: d.chunithm_play_count,
+          maimai_rating: d.maimai_rating != null ? Number(d.maimai_rating) : null,
+          chunithm_rating: d.chunithm_rating != null ? Number(d.chunithm_rating) : null,
+        }));
     }
 
     function populateYearSelect(selectId, years, onChange) {
@@ -266,7 +299,7 @@
     }
 
     async function renderGame(selector, infoSelector, data, gameKey, ratingKey, colorScheme, year) {
-      const gameData = data.map(d => ({ date: d.date, value: d[gameKey] }));
+      const gameData = data.map(d => ({ date: d.date, value: d[gameKey + "_play_count"] }));
       const ratingLookup = {};
       data.forEach(d => {
         if (d[ratingKey] != null) ratingLookup[d.date] = d[ratingKey];
