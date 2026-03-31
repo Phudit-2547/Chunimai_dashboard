@@ -1,3 +1,13 @@
+# ⚠️ ARCHIVED
+
+**This project has been archived (March 2026).**
+
+- Development continues in a new repository: **[new-repo-link]**
+- This version uses plaintext JSON files (no encryption)
+- New version uses encrypted SQLite + client-side decryption
+
+---
+
 # Chunimai Dashboard
 
 A static web dashboard that visualizes your **maimai** and **CHUNITHM** arcade play history as GitHub-style contribution heatmaps. No backend, no database server — everything runs in the browser.
