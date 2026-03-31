@@ -2,9 +2,10 @@
 
 **This project has been archived (March 2026).**
 
-- Development continues in a new repository: **[new-repo-link]**
-- This version uses plaintext JSON files (no encryption)
-- New version uses encrypted SQLite + client-side decryption
+- Development continues in the new repository: **[ChuMaiNichi](https://github.com/Phudit-2547/ChuMaiNichi)**
+- This version was a static site with GitHub Pages (plaintext JSON)
+- The new version uses **Vercel + Neon** (cloud backend, each user has their own database)
+
 
 ---
 
